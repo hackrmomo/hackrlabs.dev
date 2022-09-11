@@ -1,0 +1,20 @@
+version: '3.9'
+networks:
+  server:
+    external: true
+services:
+  hackrlabsdev:
+    container_name: hackrlabsdev
+    restart: always
+    networks:
+      server:
+        aliases:
+          - hackrlabsdev
+    build: 
+      context: ./web
+      args:
+        - PORT=${PORT}
+    env_file:
+      - .env
+    volumes:
+      - ./web:/usr/local/share/hackrlabs.dev
