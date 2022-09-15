@@ -3,13 +3,14 @@ networks:
   server:
     external: true
 services:
-  hackrlabsdev:
-    container_name: hackrlabsdev
+  hackrlabs:
+    container_name: hackrlabs
     restart: always
     networks:
       server:
         aliases:
-          - hackrlabsdev
+          - hackrlabs
+          - homehackrlabs
     build: 
       context: ./web
       args:

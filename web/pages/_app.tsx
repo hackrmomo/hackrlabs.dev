@@ -1,8 +1,29 @@
-import '../styles/globals.css'
 import type { AppProps } from 'next/app'
+import React from 'react';
+import { ThemeProvider, DefaultTheme } from 'styled-components'
 
-function MyApp({ Component, pageProps }: AppProps) {
-  return <Component {...pageProps} />
+const theme: DefaultTheme = {
+  colors: {
+    primary: '#111',
+    secondary: '#0070f3',
+  },
 }
 
-export default MyApp
+export default function App({ Component, pageProps }: AppProps) {
+
+  const [pageLoaded, setPageLoaded] = React.useState(false);
+
+  React.useEffect(() => {
+    setPageLoaded(true);
+  }, []);
+  return (
+    <>
+      <ThemeProvider theme={theme}>
+        {(pageLoaded) ?
+          <Component {...pageProps} />
+          : null
+        }
+      </ThemeProvider>
+    </>
+  )
+}
