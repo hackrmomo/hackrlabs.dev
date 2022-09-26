@@ -100,7 +100,31 @@ export const setup = async (ctx: CanvasRenderingContext2D, frameCount: number) =
       mouse.y = Math.pow((e.clientY - window.innerHeight / 2) / window.innerHeight * 2, 3);
     }
 
+    const registerTouchPosition = (e: TouchEvent) => {
+      mouse.x = Math.pow((e.touches[0].clientX - window.innerWidth / 2) / window.innerWidth * 2, 3);
+      mouse.y = Math.pow((e.touches[0].clientY - window.innerHeight / 2) / window.innerHeight * 2, 3);
+    }
+
     addEventListener("mousemove", registerMousePosition);
+    addEventListener("touchmove", registerTouchPosition);
+
+    addEventListener("focus", (e: FocusEvent) => {
+      if (e.target === window) {
+        addEventListener("mousemove", registerMousePosition);
+        addEventListener("touchmove", registerTouchPosition);
+      }
+    })
+
+    addEventListener("blur", (e: FocusEvent) => {
+      if (e.target === window) {
+        removeEventListener("mousemove", registerMousePosition);
+        removeEventListener("touchmove", registerTouchPosition);
+        mouse.x = 0;
+        mouse.y = 0;
+      }
+    });
+
+
 
     circlesMappedById.clear();
     if (circlesMappedById.keys.length === 0) {
@@ -122,7 +146,7 @@ class Circle {
   x: number;
   y: number;
   color: string = `#3399${(Math.random() * 40 + 184).toString(16).slice(0, 2)}${(Math.random() * 200 + 55).toString(16).slice(0, 2)}`;;
-  friction: number = Math.random() * 0.01 ;
+  friction: number = Math.random() * 0.01;
   restitution: number = Math.random() / 6 + 1 / 3;
   x_gravity: number = 0;
   y_gravity: number = 0;
