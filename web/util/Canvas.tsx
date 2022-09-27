@@ -37,6 +37,16 @@ var mouse = {
 const useCanvas = () => {
   const canvasRef: React.MutableRefObject<HTMLCanvasElement | null> = useRef(null);
 
+  addEventListener("resize", () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      // redo setup at frame 0
+      setup(canvas.getContext("2d")!, 0);
+    }
+  });
+
   useEffect(() => {
 
     const canvas = canvasRef.current
