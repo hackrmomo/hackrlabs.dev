@@ -6,14 +6,14 @@ import React, { useRef, useEffect } from 'react'
 
 const GRAVITY: number = 9.81;
 const GRAVITY_MULTIPLIER: number = 0.05;
-const RADIUS: number = 10;
-const SPACING: number = 40;
+const RADIUS: number = 5;
+const SPACING: number = 50;
 const MAX_VELOCITY: number = 100;
 const EXTERNAL_PADDING_PERCENT: number = 0.05;
 let X_PADDING: number = 0;
 let Y_PADDING: number = 0;
 
-var circlesMappedById: Map<string, Circle> = new Map();
+var squaresMappedById: Map<string, Square> = new Map();
 interface ICanvasProps {
   style?: React.CSSProperties
 }
@@ -60,11 +60,11 @@ const useCanvas = () => {
 
     const render = () => {
       predraw()
-      circlesMappedById.forEach(c => {
-        c.prepareAnimation();
+      squaresMappedById.forEach(s => {
+        s.prepareAnimation();
       });
-      circlesMappedById.forEach(c => {
-        c.draw();
+      squaresMappedById.forEach(s => {
+        s.draw();
       });
       postdraw()
 
@@ -97,6 +97,7 @@ export const resizeCanvasToDisplaySize = (canvas: HTMLCanvasElement) => {
 }
 
 const setupEventListeners = () => {
+
   const registerMousePosition = (e: MouseEvent) => {
     mouse.x = Math.pow((e.clientX - window.innerWidth / 2) / window.innerWidth * 3, 3);
     mouse.y = Math.pow((e.clientY - window.innerHeight / 2) / window.innerHeight * 3, 3);
@@ -111,23 +112,41 @@ const setupEventListeners = () => {
   addEventListener("touchstart", (event) => {
     addEventListener("touchmove", registerTouchPosition);
     registerTouchPosition(event);
+    squaresMappedById.forEach(s => {
+      s.cancelReset();
+    });
   });
 
-  addEventListener("touchend", () => {
+  addEventListener("touchend", (event: TouchEvent) => {
     removeEventListener("touchmove", registerTouchPosition);
     mouse.x = 0;
     mouse.y = 0;
+    if (event.touches.length === 1) {
+      removeEventListener("touchmove", registerTouchPosition);
+      squaresMappedById.forEach(s => {
+        s.reset();
+      });
+    }
   });
 
   addEventListener("mousedown", (event: MouseEvent) => {
     addEventListener("mousemove", registerMousePosition);
     registerMousePosition(event);
+    squaresMappedById.forEach(s => {
+      s.cancelReset();
+    });
   });
 
   addEventListener("mouseup", () => {
     removeEventListener("mousemove", registerMousePosition);
     mouse.x = 0;
     mouse.y = 0;
+  });
+
+  addEventListener("dblclick", () => {
+    squaresMappedById.forEach(s => {
+      s.reset();
+    });
   });
 
   addEventListener("blur", (e: FocusEvent) => {
@@ -145,28 +164,30 @@ export const setup = async (ctx: CanvasRenderingContext2D, frameCount: number) =
   if (window) {
     setupEventListeners();
 
-    // add circles
-    circlesMappedById.clear();
-    if (circlesMappedById.keys.length === 0) {
+    // add squares
+    squaresMappedById.clear();
+    if (squaresMappedById.keys.length === 0) {
       X_PADDING = window.innerWidth * EXTERNAL_PADDING_PERCENT + (window.innerWidth * (1 - EXTERNAL_PADDING_PERCENT * 2) % SPACING) / 2;
       Y_PADDING = window.innerHeight * EXTERNAL_PADDING_PERCENT + (window.innerHeight * (1 - EXTERNAL_PADDING_PERCENT * 2) % SPACING) / 2;
       for (let i = 0; i < ((window.innerWidth) * (1 - 2 * EXTERNAL_PADDING_PERCENT) / SPACING); i++) {
         for (let j = 0; j < ((window.innerHeight) * (1 - 2 * EXTERNAL_PADDING_PERCENT) / SPACING); j++) {
           const x = X_PADDING + i * SPACING;
           const y = Y_PADDING + j * SPACING;
-          const c = new Circle(ctx, x, y)
-          circlesMappedById.set(`${c.guid}`, c);
+          const c = new Square(ctx, x, y)
+          squaresMappedById.set(`${c.guid}`, c);
         }
       }
     }
   }
 }
 
-class Circle {
+class Square {
   guid: string = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   ctx: CanvasRenderingContext2D;
   initial_x: number;
   initial_y: number;
+  reset_from_x: number;
+  reset_from_y: number;
   x: number;
   y: number;
   color: string;
@@ -176,6 +197,7 @@ class Circle {
   y_gravity: number = 0;
   x_velocity: number = 0;
   y_velocity: number = 0;
+  isResetting: boolean = false;
 
   constructor(ctx: CanvasRenderingContext2D, initial_x: number, initial_y: number) {
     this.ctx = ctx;
@@ -183,6 +205,8 @@ class Circle {
     this.y = initial_y;
     this.initial_x = initial_x;
     this.initial_y = initial_y;
+    this.reset_from_x = this.x;
+    this.reset_from_y = this.y;
     this.color = checkOnImageMap(initial_x, initial_y)
       ? `#${(Math.random() * 100).toString(16).slice(0, 2)}${(Math.random() * 175).toString(16).slice(0, 2)}${(Math.random() * 255).toString(16).slice(0, 2)}`
       : "#222222"
@@ -190,26 +214,48 @@ class Circle {
   }
 
   draw = () => {
-    // Draw circle
+    // Draw square
     this.ctx.beginPath();
-    this.ctx.arc(this.x, this.y, RADIUS, 0, Math.PI * 2);
+    this.ctx.rect(this.x - RADIUS, this.y - RADIUS, RADIUS * 2, RADIUS * 2);
     this.ctx.fillStyle = this.color;
-    this.ctx.strokeStyle = this.color.slice(0, 7) + "FF";
+    this.ctx.shadowColor = this.color;
+    this.ctx.shadowBlur = 20;
+    this.ctx.fill();
     this.ctx.lineWidth = 3;
-    this.ctx.stroke();
   }
 
   calculateGravity = () => {
-    this.x_gravity = GRAVITY * (window.innerWidth > window.innerHeight ? window.innerWidth / window.innerHeight : 1) * GRAVITY_MULTIPLIER * (mouse.x);
-    this.y_gravity = GRAVITY * (window.innerHeight > window.innerWidth ? window.innerHeight / window.innerWidth : 1) * GRAVITY_MULTIPLIER * (mouse.y);
+    if (this.isResetting) {
+      this.x_gravity = GRAVITY * (this.initial_x - this.x) / window.innerWidth * GRAVITY_MULTIPLIER * 100;
+      this.y_gravity = GRAVITY * (this.initial_y - this.y) / window.innerHeight * GRAVITY_MULTIPLIER * 100;
+      // this.x_gravity = 0;
+      // this.y_gravity = 0;
+    } else {
+      this.x_gravity = GRAVITY * (window.innerWidth > window.innerHeight ? window.innerWidth / window.innerHeight : 1) * GRAVITY_MULTIPLIER * (mouse.x);
+      this.y_gravity = GRAVITY * (window.innerHeight > window.innerWidth ? window.innerHeight / window.innerWidth : 1) * GRAVITY_MULTIPLIER * (mouse.y);
+    }
   }
 
   calculateVelocity = () => {
-    this.x_velocity += this.x_gravity;
-    this.y_velocity += this.y_gravity;
 
-    this.x_velocity *= 1 - this.friction;
-    this.y_velocity *= 1 - this.friction;
+    if (this.isResetting) {
+      // set velocity to start slow, then speed up, then slow down, then stop from reset_from to initial
+      const x_distance = this.reset_from_x - this.initial_x;
+      const y_distance = this.reset_from_y - this.initial_y;
+      const x_distance_from_initial = this.x - this.initial_x;
+      const y_distance_from_initial = this.y - this.initial_y;
+
+      const x_distance_from_initial_percent = Math.abs(x_distance_from_initial / x_distance);
+      const y_distance_from_initial_percent = Math.abs(y_distance_from_initial / y_distance);
+
+      this.x_velocity = x_distance_from_initial_percent * -x_distance_from_initial;
+      this.y_velocity = y_distance_from_initial_percent * -y_distance_from_initial;
+    } else {
+      this.x_velocity += this.x_gravity;
+      this.y_velocity += this.y_gravity;
+      this.x_velocity *= 1 - this.friction;
+      this.y_velocity *= 1 - this.friction;
+    }
 
     if (Math.abs(this.x_velocity) > MAX_VELOCITY) {
       this.x_velocity = MAX_VELOCITY * (this.x_velocity > 0 ? 1 : -1);
@@ -233,11 +279,23 @@ class Circle {
     }
     if (this.y > window.innerHeight - EXTERNAL_PADDING_PERCENT * window.innerHeight / 2) {
       this.y = window.innerHeight - EXTERNAL_PADDING_PERCENT * window.innerHeight / 2;
-      this.y_velocity *= -this.restitution;
+      this.y_velocity *= -this.restitution * 0.9;
     }
     if (this.y < EXTERNAL_PADDING_PERCENT * window.innerHeight / 2) {
       this.y = EXTERNAL_PADDING_PERCENT * window.innerHeight / 2;
-      this.y_velocity *= -this.restitution;
+      this.y_velocity *= -this.restitution * 0.9;
+    }
+
+    if (this.isResetting) {
+      if (Math.abs(this.x - this.initial_x) < 1 && Math.abs(this.y - this.initial_y) < 1 && Math.abs(this.x_velocity) < 0.1 && Math.abs(this.y_velocity) < 0.1) {
+        this.isResetting = false;
+        this.x = this.initial_x;
+        this.y = this.initial_y;
+        this.x_gravity = 0;
+        this.y_gravity = 0;
+        this.x_velocity = 0;
+        this.y_velocity = 0;
+      }
     }
   }
 
@@ -245,6 +303,18 @@ class Circle {
     this.calculateGravity();
     this.calculateVelocity();
     this.calculatePosition();
+  }
+
+  reset = () => {
+    this.isResetting = true;
+    this.reset_from_x = this.x;
+    this.reset_from_y = this.y;
+    this.x_gravity = 0;
+    this.y_gravity = 0;
+  }
+
+  cancelReset = () => {
+    this.isResetting = false;
   }
 
 }
@@ -256,13 +326,15 @@ const checkOnImageMap = (x: number, y: number) => {
   const x_center = window.innerWidth / 2;
   const y_center = window.innerHeight / 2;
 
+  const unit = smallestDimension / 100;
+
   if (x < x_offset || x > window.innerWidth - x_offset || y < y_offset || y > window.innerHeight - y_offset) {
     return false;
   }
-  if (Math.abs(x - x_center) < 150 && Math.abs(y - y_center) < 150) {
+  if (Math.abs(x - x_center) < unit * 20 && Math.abs(y - y_center) < unit * 20) {
     return true;
   }
-  if (Math.abs(x - x_center) >= 150) {
+  if (Math.abs(x - x_center) >= unit * 20) {
     return true;
   }
   return false;
