@@ -7,10 +7,13 @@ import React, { useRef, useEffect } from 'react'
 const GRAVITY: number = 9.81;
 const GRAVITY_MULTIPLIER: number = 0.05;
 const RADIUS: number = 10;
-const SPACING: number = 60;
-const MAX_VELOCITY: number = 60;
-const EXTERNAL_PADDING_PERCENT: number = 0.15;
+const SPACING: number = 40;
+const MAX_VELOCITY: number = 100;
+const EXTERNAL_PADDING_PERCENT: number = 0.05;
+let X_PADDING: number = 0;
+let Y_PADDING: number = 0;
 
+var circlesMappedById: Map<string, Circle> = new Map();
 interface ICanvasProps {
   style?: React.CSSProperties
 }
@@ -19,7 +22,9 @@ export const Canvas = (props: ICanvasProps) => {
 
   const { style, ...rest } = props
   const canvasRef = useCanvas()
-  return <canvas style={style} ref={canvasRef} {...rest}></canvas>
+  return <>
+    <canvas style={style} ref={canvasRef} {...rest}></canvas>
+  </>
 }
 
 // Mouse and Device position
@@ -28,12 +33,12 @@ var mouse = {
   y: 0
 }
 
-var circlesMappedById: Map<string, Circle> = new Map();
 
 const useCanvas = () => {
   const canvasRef: React.MutableRefObject<HTMLCanvasElement | null> = useRef(null);
 
   useEffect(() => {
+
     const canvas = canvasRef.current
     const context = canvas!.getContext('2d')!
     let frameCount = 0
@@ -91,47 +96,64 @@ export const resizeCanvasToDisplaySize = (canvas: HTMLCanvasElement) => {
   return false
 }
 
+const setupEventListeners = () => {
+  const registerMousePosition = (e: MouseEvent) => {
+    mouse.x = Math.pow((e.clientX - window.innerWidth / 2) / window.innerWidth * 3, 3);
+    mouse.y = Math.pow((e.clientY - window.innerHeight / 2) / window.innerHeight * 3, 3);
+  }
+
+  const registerTouchPosition = (e: TouchEvent) => {
+    e.preventDefault();
+    mouse.x = Math.pow((e.touches[0].clientX - window.innerWidth / 2) / window.innerWidth * 3, 3);
+    mouse.y = Math.pow((e.touches[0].clientY - window.innerHeight / 2) / window.innerHeight * 3, 3);
+  }
+
+  addEventListener("touchstart", (event) => {
+    addEventListener("touchmove", registerTouchPosition);
+    registerTouchPosition(event);
+  });
+
+  addEventListener("touchend", () => {
+    removeEventListener("touchmove", registerTouchPosition);
+    mouse.x = 0;
+    mouse.y = 0;
+  });
+
+  addEventListener("mousedown", (event: MouseEvent) => {
+    addEventListener("mousemove", registerMousePosition);
+    registerMousePosition(event);
+  });
+
+  addEventListener("mouseup", () => {
+    removeEventListener("mousemove", registerMousePosition);
+    mouse.x = 0;
+    mouse.y = 0;
+  });
+
+  addEventListener("blur", (e: FocusEvent) => {
+    if (e.target === window) {
+      removeEventListener("mousemove", registerMousePosition);
+      removeEventListener("touchmove", registerTouchPosition);
+      mouse.x = 0;
+      mouse.y = 0;
+    }
+  });
+}
+
 
 export const setup = async (ctx: CanvasRenderingContext2D, frameCount: number) => {
   if (window) {
+    setupEventListeners();
 
-    const registerMousePosition = (e: MouseEvent) => {
-      mouse.x = Math.pow((e.clientX - window.innerWidth / 2) / window.innerWidth * 2, 3);
-      mouse.y = Math.pow((e.clientY - window.innerHeight / 2) / window.innerHeight * 2, 3);
-    }
-
-    const registerTouchPosition = (e: TouchEvent) => {
-      mouse.x = Math.pow((e.touches[0].clientX - window.innerWidth / 2) / window.innerWidth * 2, 3);
-      mouse.y = Math.pow((e.touches[0].clientY - window.innerHeight / 2) / window.innerHeight * 2, 3);
-    }
-
-    addEventListener("mousemove", registerMousePosition);
-    addEventListener("touchmove", registerTouchPosition);
-
-    addEventListener("focus", (e: FocusEvent) => {
-      if (e.target === window) {
-        addEventListener("mousemove", registerMousePosition);
-        addEventListener("touchmove", registerTouchPosition);
-      }
-    })
-
-    addEventListener("blur", (e: FocusEvent) => {
-      if (e.target === window) {
-        removeEventListener("mousemove", registerMousePosition);
-        removeEventListener("touchmove", registerTouchPosition);
-        mouse.x = 0;
-        mouse.y = 0;
-      }
-    });
-
-
-
+    // add circles
     circlesMappedById.clear();
     if (circlesMappedById.keys.length === 0) {
+      X_PADDING = window.innerWidth * EXTERNAL_PADDING_PERCENT + (window.innerWidth * (1 - EXTERNAL_PADDING_PERCENT * 2) % SPACING) / 2;
+      Y_PADDING = window.innerHeight * EXTERNAL_PADDING_PERCENT + (window.innerHeight * (1 - EXTERNAL_PADDING_PERCENT * 2) % SPACING) / 2;
       for (let i = 0; i < ((window.innerWidth) * (1 - 2 * EXTERNAL_PADDING_PERCENT) / SPACING); i++) {
         for (let j = 0; j < ((window.innerHeight) * (1 - 2 * EXTERNAL_PADDING_PERCENT) / SPACING); j++) {
-          const x = EXTERNAL_PADDING_PERCENT * window.innerWidth + i * SPACING;
-          const y = EXTERNAL_PADDING_PERCENT * window.innerHeight + j * SPACING;
+          const x = X_PADDING + i * SPACING;
+          const y = Y_PADDING + j * SPACING;
           const c = new Circle(ctx, x, y)
           circlesMappedById.set(`${c.guid}`, c);
         }
@@ -143,9 +165,11 @@ export const setup = async (ctx: CanvasRenderingContext2D, frameCount: number) =
 class Circle {
   guid: string = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   ctx: CanvasRenderingContext2D;
+  initial_x: number;
+  initial_y: number;
   x: number;
   y: number;
-  color: string = `#3399${(Math.random() * 40 + 184).toString(16).slice(0, 2)}${(Math.random() * 200 + 55).toString(16).slice(0, 2)}`;;
+  color: string;
   friction: number = Math.random() * 0.01;
   restitution: number = Math.random() / 6 + 1 / 3;
   x_gravity: number = 0;
@@ -157,6 +181,12 @@ class Circle {
     this.ctx = ctx;
     this.x = initial_x;
     this.y = initial_y;
+    this.initial_x = initial_x;
+    this.initial_y = initial_y;
+    this.color = checkOnImageMap(initial_x, initial_y)
+      ? `#${(Math.random() * 100).toString(16).slice(0, 2)}${(Math.random() * 175).toString(16).slice(0, 2)}${(Math.random() * 255).toString(16).slice(0, 2)}`
+      : "#222222"
+    console.log(this.initial_x, this.initial_y);
   }
 
   draw = () => {
@@ -165,10 +195,8 @@ class Circle {
     this.ctx.arc(this.x, this.y, RADIUS, 0, Math.PI * 2);
     this.ctx.fillStyle = this.color;
     this.ctx.strokeStyle = this.color.slice(0, 7) + "FF";
-    this.ctx.shadowColor = this.color.slice(0, 7) + "FF";
-    this.ctx.shadowBlur = 10;
+    this.ctx.lineWidth = 3;
     this.ctx.stroke();
-    this.ctx.fill();
   }
 
   calculateGravity = () => {
@@ -183,17 +211,17 @@ class Circle {
     this.x_velocity *= 1 - this.friction;
     this.y_velocity *= 1 - this.friction;
 
-    if (this.x_velocity > MAX_VELOCITY) {
-      this.x_velocity = MAX_VELOCITY;
+    if (Math.abs(this.x_velocity) > MAX_VELOCITY) {
+      this.x_velocity = MAX_VELOCITY * (this.x_velocity > 0 ? 1 : -1);
     }
-    if (this.y_velocity > MAX_VELOCITY) {
-      this.y_velocity = MAX_VELOCITY;
+    if (Math.abs(this.y_velocity) > MAX_VELOCITY) {
+      this.y_velocity = MAX_VELOCITY * (this.y_velocity > 0 ? 1 : -1);
     }
   }
 
   calculatePosition = () => {
-    this.x += this.x_velocity;
-    this.y += this.y_velocity;
+    this.x += this.x_velocity; // what about this
+    this.y += this.y_velocity; // okay this kinda looks
 
     if (this.x > window.innerWidth - EXTERNAL_PADDING_PERCENT * window.innerWidth / 2) {
       this.x = window.innerWidth - EXTERNAL_PADDING_PERCENT * window.innerWidth / 2;
@@ -219,4 +247,23 @@ class Circle {
     this.calculatePosition();
   }
 
+}
+
+const checkOnImageMap = (x: number, y: number) => {
+  const smallestDimension = window.innerWidth > window.innerHeight ? window.innerHeight : window.innerWidth;
+  const x_offset = (window.innerWidth - smallestDimension) / 2;
+  const y_offset = (window.innerHeight - smallestDimension) / 2;
+  const x_center = window.innerWidth / 2;
+  const y_center = window.innerHeight / 2;
+
+  if (x < x_offset || x > window.innerWidth - x_offset || y < y_offset || y > window.innerHeight - y_offset) {
+    return false;
+  }
+  if (Math.abs(x - x_center) < 150 && Math.abs(y - y_center) < 150) {
+    return true;
+  }
+  if (Math.abs(x - x_center) >= 150) {
+    return true;
+  }
+  return false;
 }
