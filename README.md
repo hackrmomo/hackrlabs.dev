@@ -11,6 +11,12 @@ This website will be the homepage for all of my projects. Any and all projects w
 ## Todo for this page:
 - Add links to pages
 - Update favicon to be an ico
+- Add ability to toggle dark mode and light mode
+- Add ability to change dot radius
+- Add ability to change dot colors (ish)
+- Add ability to change dot spacing
+- Add ability to get dot to follow cursor instead of tilt
+- Add animation to show that the plane is clickable
 
 ## Possible Projects:
 - Mobile Monopoly Client
