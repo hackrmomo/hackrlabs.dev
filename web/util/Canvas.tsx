@@ -6,8 +6,8 @@ import React, { useRef, useEffect } from 'react'
 
 const GRAVITY: number = 9.81;
 const GRAVITY_MULTIPLIER: number = 0.05;
-const RADIUS: number = 5;
-const SPACING: number = 50;
+const RADIUS: number = 2;
+const SPACING: number = 35;
 const MAX_VELOCITY: number = 100;
 const EXTERNAL_PADDING_PERCENT: number = 0.05;
 let X_PADDING: number = 0;
@@ -218,8 +218,8 @@ class Square {
     this.reset_from_x = this.x;
     this.reset_from_y = this.y;
     this.color = checkOnImageMap(initial_x, initial_y)
-      ? `#${(Math.random() * 100).toString(16).slice(0, 2)}${(Math.random() * 175).toString(16).slice(0, 2)}${(Math.random() * 255).toString(16).slice(0, 2)}`
-      : "#222222"
+      ? `#${(Math.random() * 70 + 100).toString(16).slice(0, 2)}${(Math.random() * 100 + 100).toString(16).slice(0, 2)}${(Math.random() * 155 + 100).toString(16).slice(0, 2)}`
+      : "#FFFFFF22"
     console.log(this.initial_x, this.initial_y);
   }
 
