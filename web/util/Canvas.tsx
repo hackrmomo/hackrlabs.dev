@@ -346,13 +346,18 @@ const checkOnImageMap = (x: number, y: number) => {
 
   const unit = smallestDimension / 100;
 
+  // borders
   if (x < x_offset || x > window.innerWidth - x_offset || y < y_offset || y > window.innerHeight - y_offset) {
     return false;
   }
-  if (Math.abs(x - x_center) < unit * 20 && Math.abs(y - y_center) < unit * 20) {
+
+  // center triangle
+  if ((Math.abs(x - x_center) / -(y - y_center / 1.5) > 1 || y > y_center / 1.5) && (Math.abs(x - x_center) / -(y - y_center- y_center * 0.25) < 1 && y < y_center*1.25)) {
     return true;
   }
-  if (Math.abs(x - x_center) >= unit * 20) {
+
+  // bars
+  if (Math.abs(x - x_center) >= unit * 30) {
     return true;
   }
   return false;
