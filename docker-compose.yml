@@ -10,7 +10,6 @@ services:
       server:
         aliases:
           - hackrlabs
-          - homehackrlabs
     build: 
       context: ./web
       args:
