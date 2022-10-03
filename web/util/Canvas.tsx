@@ -5,7 +5,7 @@
 import React, { useRef, useEffect } from 'react'
 
 const GRAVITY: number = 9.81;
-const GRAVITY_MULTIPLIER: number = 0.05;
+const GRAVITY_MULTIPLIER: number = 0.01;
 const RADIUS: number = 2;
 const SPACING: number = 35;
 const MAX_VELOCITY: number = 100;
@@ -30,7 +30,8 @@ export const Canvas = (props: ICanvasProps) => {
 // Mouse and Device position
 var mouse = {
   x: 0,
-  y: 0
+  y: 0,
+  down: false
 }
 
 
@@ -109,14 +110,16 @@ export const resizeCanvasToDisplaySize = (canvas: HTMLCanvasElement) => {
 const setupEventListeners = () => {
 
   const registerMousePosition = (e: MouseEvent) => {
-    mouse.x = Math.pow((e.clientX - window.innerWidth / 2) / window.innerWidth * 3, 3);
-    mouse.y = Math.pow((e.clientY - window.innerHeight / 2) / window.innerHeight * 3, 3);
+    mouse.x = (e.clientX - window.innerWidth / 2) / window.innerWidth * 3
+    mouse.y = (e.clientY - window.innerHeight / 2) / window.innerHeight * 3
+    mouse.down = e.buttons > 0;
   }
 
   const registerTouchPosition = (e: TouchEvent) => {
     e.preventDefault();
-    mouse.x = Math.pow((e.touches[0].clientX - window.innerWidth / 2) / window.innerWidth * 3, 3);
-    mouse.y = Math.pow((e.touches[0].clientY - window.innerHeight / 2) / window.innerHeight * 3, 3);
+    mouse.x = (e.touches[0].clientX - window.innerWidth / 2) / window.innerWidth * 3
+    mouse.y = (e.touches[0].clientY - window.innerHeight / 2) / window.innerHeight * 3
+    mouse.down = e.touches.length > 0;
   }
 
   addEventListener("touchstart", (event) => {
@@ -131,6 +134,7 @@ const setupEventListeners = () => {
     removeEventListener("touchmove", registerTouchPosition);
     mouse.x = 0;
     mouse.y = 0;
+    mouse.down = false;
     if (event.touches.length === 1) {
       removeEventListener("touchmove", registerTouchPosition);
       squaresMappedById.forEach(s => {
@@ -151,6 +155,7 @@ const setupEventListeners = () => {
     removeEventListener("mousemove", registerMousePosition);
     mouse.x = 0;
     mouse.y = 0;
+    mouse.down = false;
   });
 
   addEventListener("dblclick", () => {
@@ -165,6 +170,7 @@ const setupEventListeners = () => {
       removeEventListener("touchmove", registerTouchPosition);
       mouse.x = 0;
       mouse.y = 0;
+      mouse.down = false;
     }
   });
 }
@@ -201,7 +207,7 @@ class Square {
   x: number;
   y: number;
   color: string;
-  friction: number = Math.random() * 0.01;
+  friction: number = Math.random() * 0.005;
   restitution: number = Math.random() / 6 + 1 / 3;
   x_gravity: number = 0;
   y_gravity: number = 0;
@@ -229,7 +235,7 @@ class Square {
     this.ctx.rect(this.x - RADIUS, this.y - RADIUS, RADIUS * 2, RADIUS * 2);
     this.ctx.fillStyle = this.color;
     this.ctx.shadowColor = this.color;
-    this.ctx.shadowBlur = 20;
+    this.ctx.shadowBlur = 5;
     this.ctx.fill();
     this.ctx.lineWidth = 3;
   }
@@ -241,8 +247,10 @@ class Square {
       // this.x_gravity = 0;
       // this.y_gravity = 0;
     } else {
-      this.x_gravity = GRAVITY * (window.innerWidth > window.innerHeight ? window.innerWidth / window.innerHeight : 1) * GRAVITY_MULTIPLIER * (mouse.x);
-      this.y_gravity = GRAVITY * (window.innerHeight > window.innerWidth ? window.innerHeight / window.innerWidth : 1) * GRAVITY_MULTIPLIER * (mouse.y);
+      const x_relative_to_center = (this.x - window.innerWidth / 2) / window.innerWidth * 3
+      const y_relative_to_center = (this.y - window.innerHeight / 2) / window.innerHeight * 3
+      this.x_gravity = GRAVITY * (window.innerWidth > window.innerHeight ? window.innerWidth / window.innerHeight : 1) * GRAVITY_MULTIPLIER * -(x_relative_to_center - mouse.x) * (mouse.down ? 1 : 0);
+      this.y_gravity = GRAVITY * (window.innerHeight > window.innerWidth ? window.innerHeight / window.innerWidth : 1) * GRAVITY_MULTIPLIER * -(y_relative_to_center - mouse.y) * (mouse.down ? 1 : 0);
     }
   }
 
