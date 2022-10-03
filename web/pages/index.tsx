@@ -15,7 +15,20 @@ const Home: NextPage = () => {
         <meta name="description" content="colorful dots go brrr" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"></meta>
         <link rel="icon" href="/hackrlabs.png" />
-        <style>{`body { margin: 0px; padding: 0px; background-image: linear-gradient(120deg, #000000, #030303); overscroll-behavior-y: contain; touch-action: none; user-select: none; }`}</style>
+        <style>{`
+          body {
+            margin: 0px; 
+            padding: 0px; 
+            background-image: linear-gradient(120deg, #000000, #030303); 
+            overscroll-behavior-y: contain; 
+            touch-action: none; 
+            user-select: none; 
+          } 
+          canvas {
+            -webkit-transform3d: translate(0,0,0);
+            -moz-transform3d: translate(0,0,0);
+            transform3d: translate(0,0,0);
+          }`}</style>
       </Head>
 
       <Canvas style={{ width: "100%", height: "100%" }} />
