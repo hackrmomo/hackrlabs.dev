@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:wasm": "cd wasm && wasm-pack build --target web --out-name wasm --out-dir ./main",
     "start": "next start",
     "lint": "next lint"
   },

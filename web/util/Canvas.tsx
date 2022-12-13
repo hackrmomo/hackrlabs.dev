@@ -2,13 +2,11 @@
 // inspired collision detection system from implementation in https://github.com/JBreidfjord/particle-sim
 // lol looks like we didn't use particle collision in the end
 
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect } from 'react';
+import init, { check_on_image_map, calculate_position } from "../wasm/main"
 
-const GRAVITY: number = 9.81;
-const GRAVITY_MULTIPLIER: number = 0.01;
 const RADIUS: number = 2;
 const SPACING: number = 35;
-const MAX_VELOCITY: number = 100;
 const EXTERNAL_PADDING_PERCENT: number = 0.05;
 let X_PADDING: number = 0;
 let Y_PADDING: number = 0;
@@ -19,11 +17,11 @@ interface ICanvasProps {
 }
 
 export const Canvas = (props: ICanvasProps) => {
-
   const { style, ...rest } = props
-  const canvasRef = useCanvas()
+
+  let canvasRef: React.MutableRefObject<HTMLCanvasElement | null> | null = useCanvas();
   return <>
-    <canvas style={style} ref={canvasRef} {...rest}></canvas>
+    {canvasRef && <canvas style={style} ref={canvasRef} {...rest}></canvas>}
   </>
 }
 
@@ -37,6 +35,12 @@ var mouse = {
 
 const useCanvas = () => {
   const canvasRef: React.MutableRefObject<HTMLCanvasElement | null> = useRef(null);
+  const [wasmInstantiated, setWasmInstantiated] = React.useState(false);
+  useEffect(() => {
+    init().then(() => {
+      setWasmInstantiated(true);
+    });
+  }, []);
 
   addEventListener("resize", () => {
     const canvas = canvasRef.current;
@@ -49,6 +53,9 @@ const useCanvas = () => {
   });
 
   useEffect(() => {
+    if (!wasmInstantiated) {
+      return;
+    }
 
     const canvas = canvasRef.current
     const context = canvas!.getContext('2d')!
@@ -86,9 +93,9 @@ const useCanvas = () => {
     return () => {
       window.cancelAnimationFrame(animationFrameId)
     }
-  }, [])
+  }, [wasmInstantiated])
 
-  return canvasRef
+  return wasmInstantiated ? canvasRef : null;
 }
 
 export const resizeCanvasToDisplaySize = (canvas: HTMLCanvasElement) => {
@@ -213,7 +220,7 @@ class Square {
   y_gravity: number = 0;
   x_velocity: number = 0;
   y_velocity: number = 0;
-  isResetting: boolean = false;
+  is_resetting: boolean = false;
 
   constructor(ctx: CanvasRenderingContext2D, initial_x: number, initial_y: number) {
     this.ctx = ctx;
@@ -223,7 +230,7 @@ class Square {
     this.initial_y = initial_y;
     this.reset_from_x = this.x;
     this.reset_from_y = this.y;
-    this.color = checkOnImageMap(initial_x, initial_y)
+    this.color = check_on_image_map(initial_x, initial_y, innerHeight, innerWidth)
       ? `#${(Math.random() * 70 + 100).toString(16).slice(0, 2)}${(Math.random() * 100 + 100).toString(16).slice(0, 2)}${(Math.random() * 155 + 100).toString(16).slice(0, 2)}`
       : "#FFFFFF22"
     console.log(this.initial_x, this.initial_y);
@@ -234,97 +241,46 @@ class Square {
     this.ctx.beginPath();
     this.ctx.rect(this.x - RADIUS, this.y - RADIUS, RADIUS * 2, RADIUS * 2);
     this.ctx.fillStyle = this.color;
-    this.ctx.shadowColor = this.color;
-    this.ctx.shadowBlur = 5;
     this.ctx.fill();
     this.ctx.lineWidth = 3;
   }
 
-  calculateGravity = () => {
-    if (this.isResetting) {
-      this.x_gravity = GRAVITY * (this.initial_x - this.x) / window.innerWidth * GRAVITY_MULTIPLIER * 100;
-      this.y_gravity = GRAVITY * (this.initial_y - this.y) / window.innerHeight * GRAVITY_MULTIPLIER * 100;
-      // this.x_gravity = 0;
-      // this.y_gravity = 0;
-    } else {
-      const x_relative_to_center = (this.x - window.innerWidth / 2) / window.innerWidth * 3
-      const y_relative_to_center = (this.y - window.innerHeight / 2) / window.innerHeight * 3
-      this.x_gravity = GRAVITY * (window.innerWidth > window.innerHeight ? window.innerWidth / window.innerHeight : 1) * GRAVITY_MULTIPLIER * -(x_relative_to_center - mouse.x) * (mouse.down ? 1 : 0);
-      this.y_gravity = GRAVITY * (window.innerHeight > window.innerWidth ? window.innerHeight / window.innerWidth : 1) * GRAVITY_MULTIPLIER * -(y_relative_to_center - mouse.y) * (mouse.down ? 1 : 0);
-    }
-  }
-
-  calculateVelocity = () => {
-
-    if (this.isResetting) {
-      // set velocity to start slow, then speed up, then slow down, then stop from reset_from to initial
-      const x_distance = this.reset_from_x - this.initial_x;
-      const y_distance = this.reset_from_y - this.initial_y;
-      const x_distance_from_initial = this.x - this.initial_x;
-      const y_distance_from_initial = this.y - this.initial_y;
-
-      const x_distance_from_initial_percent = Math.abs(x_distance_from_initial / x_distance);
-      const y_distance_from_initial_percent = Math.abs(y_distance_from_initial / y_distance);
-
-      this.x_velocity = x_distance_from_initial_percent * -x_distance_from_initial;
-      this.y_velocity = y_distance_from_initial_percent * -y_distance_from_initial;
-    } else {
-      this.x_velocity += this.x_gravity;
-      this.y_velocity += this.y_gravity;
-      this.x_velocity *= 1 - this.friction;
-      this.y_velocity *= 1 - this.friction;
-    }
-
-    if (Math.abs(this.x_velocity) > MAX_VELOCITY) {
-      this.x_velocity = MAX_VELOCITY * (this.x_velocity > 0 ? 1 : -1);
-    }
-    if (Math.abs(this.y_velocity) > MAX_VELOCITY) {
-      this.y_velocity = MAX_VELOCITY * (this.y_velocity > 0 ? 1 : -1);
-    }
-  }
-
-  calculatePosition = () => {
-    this.x += this.x_velocity; // what about this
-    this.y += this.y_velocity; // okay this kinda looks
-
-    if (this.x > window.innerWidth - EXTERNAL_PADDING_PERCENT * window.innerWidth / 2) {
-      this.x = window.innerWidth - EXTERNAL_PADDING_PERCENT * window.innerWidth / 2;
-      this.x_velocity *= -this.restitution;
-    }
-    if (this.x < EXTERNAL_PADDING_PERCENT * window.innerWidth / 2) {
-      this.x = EXTERNAL_PADDING_PERCENT * window.innerWidth / 2;
-      this.x_velocity *= -this.restitution;
-    }
-    if (this.y > window.innerHeight - EXTERNAL_PADDING_PERCENT * window.innerHeight / 2) {
-      this.y = window.innerHeight - EXTERNAL_PADDING_PERCENT * window.innerHeight / 2;
-      this.y_velocity *= -this.restitution * 0.9;
-    }
-    if (this.y < EXTERNAL_PADDING_PERCENT * window.innerHeight / 2) {
-      this.y = EXTERNAL_PADDING_PERCENT * window.innerHeight / 2;
-      this.y_velocity *= -this.restitution * 0.9;
-    }
-
-    if (this.isResetting) {
-      if (Math.abs(this.x - this.initial_x) < 1 && Math.abs(this.y - this.initial_y) < 1 && Math.abs(this.x_velocity) < 0.1 && Math.abs(this.y_velocity) < 0.1) {
-        this.isResetting = false;
-        this.x = this.initial_x;
-        this.y = this.initial_y;
-        this.x_gravity = 0;
-        this.y_gravity = 0;
-        this.x_velocity = 0;
-        this.y_velocity = 0;
-      }
-    }
-  }
-
   prepareAnimation = () => {
-    this.calculateGravity();
-    this.calculateVelocity();
-    this.calculatePosition();
+    try {
+      let s = calculate_position(
+        mouse.x,
+        mouse.y,
+        mouse.down,
+        this.x,
+        this.y,
+        this.x_velocity,
+        this.y_velocity,
+        this.x_gravity,
+        this.y_gravity,
+        this.is_resetting,
+        this.reset_from_x,
+        this.reset_from_y,
+        this.friction,
+        this.restitution,
+        this.initial_x,
+        this.initial_y,
+        window.innerWidth,
+        window.innerHeight
+         ) as Square;
+      this.x = s.x;
+      this.y = s.y;
+      this.x_velocity = s.x_velocity;
+      this.y_velocity = s.y_velocity;
+      this.x_gravity = s.x_gravity;
+      this.y_gravity = s.y_gravity;
+      this.is_resetting = s.is_resetting;
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   reset = () => {
-    this.isResetting = true;
+    this.is_resetting = true;
     this.reset_from_x = this.x;
     this.reset_from_y = this.y;
     this.x_gravity = 0;
@@ -332,33 +288,7 @@ class Square {
   }
 
   cancelReset = () => {
-    this.isResetting = false;
+    this.is_resetting = false;
   }
 
-}
-
-const checkOnImageMap = (x: number, y: number) => {
-  const smallestDimension = window.innerWidth > window.innerHeight ? window.innerHeight : window.innerWidth;
-  const x_offset = (window.innerWidth - smallestDimension) / 2;
-  const y_offset = (window.innerHeight - smallestDimension) / 2;
-  const x_center = window.innerWidth / 2;
-  const y_center = window.innerHeight / 2;
-
-  const unit = smallestDimension / 100;
-
-  // borders
-  if (x < x_offset || x > window.innerWidth - x_offset || y < y_offset || y > window.innerHeight - y_offset) {
-    return false;
-  }
-
-  // center triangle
-  if ((Math.abs(x - x_center) / -(y - y_center / 1.5) > 1 || y > y_center / 1.5) && (Math.abs(x - x_center) / -(y - y_center- y_center * 0.25) < 1 && y < y_center*1.25)) {
-    return true;
-  }
-
-  // bars
-  if (Math.abs(x - x_center) >= unit * 30) {
-    return true;
-  }
-  return false;
 }
